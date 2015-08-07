@@ -1,0 +1,13 @@
+<head>
+    <title>HX9</title>
+</head>
+
+<body>
+    <h1>A</h1>
+    <ul>
+        {{#each messages}} {{> message}} {{/each}}
+    </ul>
+</body>
+<template name="message">
+    <li>{{_id}} - {{from}} - {{to}} - {{content}} - {{createdTime}}</li>
+</template>
