@@ -9,3 +9,4 @@ aldeed:collection2
 accounts-password
 momentjs:moment
 meteorhacks:aggregate
+percolate:synced-cron

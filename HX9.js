@@ -86,6 +86,10 @@ Schema.UserProfile = new SimpleSchema({
     needUpdateSpecialInfoCount: {
         type: Number,
         defaultValue: 0
+    },
+    blackList:{
+        type: [String],
+        optional: true
     }
 });
 
@@ -209,7 +213,7 @@ Schema.Meet = new SimpleSchema({
     },
     status: {
         type: String,
-        allowedValues: ['待确认', '待回复', '成功']
+        allowedValues: ['待确认', '待回复', '成功', '失败']
     },
     newMatchCount: {
         type: Number,
