@@ -4,25 +4,25 @@ Schema = {};
 Schema.SelfSpecialInfo = new SimpleSchema({
     hair: {
         type: String,
-        allowedValues: ['长(男)', '短(男)', '长(女)', '短(女)']
+        allowedValues: ['竖起来(包括光头)', '躺下', '戴帽子', '辫子/盘发', '短发(齐肩,不过肩)', '长发(过肩)']
     },
     glasses: {
         type: String,
-        allowedValues: ['带', '不带']
+        allowedValues: ['有', '无']
 
     },
     clothesType: {
         type: String,
-        allowedValues: ['大衣(男)', '衬衫(男)', '大衣(女)', '衬衫(女)']
+        allowedValues: ['风衣/大衣', '西装/夹克/套装', '运动外套/卫衣', 'T恤长袖', 'T恤短袖', '马甲/背心', '长袖衬衫', '短袖衬衫', '毛衣/羊毛绒/线衫/针织', '连体裙']
 
     },
     clothesColor: {
         type: String,
-        allowedValues: ['黑(男)', '白(男)', '黑(女)', '白(女)']
+        allowedValues: ['红/紫/粉', '黄', '蓝/绿', '白', '黑', '灰', '无法分辨主要颜色(彩色,且难以判断主体颜色)']
     },
     clothesStyle: {
         type: String,
-        allowedValues: ['纯色(男)', '条纹(男)', '纯色(女)', '条纹(女)']
+        allowedValues: ['纯色', '线条,格子,色块', '图案(抽象,卡通,画等有具体内容)']
     },
     specialPic: {
         type: String
@@ -87,7 +87,7 @@ Schema.UserProfile = new SimpleSchema({
         type: Number,
         defaultValue: 0
     },
-    blackList:{
+    blackList: {
         type: [String],
         optional: true
     }

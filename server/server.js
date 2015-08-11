@@ -1,27 +1,36 @@
  Meteor.startup(function() {
      // code to run on server at startup
      SyncedCron.add({
-      name: 'Crunch some important numbers for the marketing department',
-      schedule: function(parser) {
-        // parser is a later.parse object
-        return parser.text('every 5 seconds');
-      },
-      job: function() {
-        //把超时的待回复/待确认meet设置为失败
-        var tmpNow = new Date();
-        Meets.update({
-            status: { $in: [ '待回复', '待确认' ] },
-            $and: [ 
-                { 
-                    createdTime: {$lt: moment(tmpNow).add(-60, 'minutes').toDate()}
-                },
-                { 
-                    createdTime: {$gt: moment(tmpNow).add(-61, 'minutes').toDate()}
-                } 
-            ]
-        }, {$set: {status: '失败'}}, {multi: true});
-      }
-    });
+         name: 'Crunch some important numbers for the marketing department',
+         schedule: function(parser) {
+             // parser is a later.parse object
+             return parser.text('every 5 seconds');
+         },
+         job: function() {
+             //把超时的待回复/待确认meet设置为失败
+             var tmpNow = new Date();
+             Meets.update({
+                 status: {
+                     $in: ['待回复', '待确认']
+                 },
+                 $and: [{
+                     createdTime: {
+                         $lt: moment(tmpNow).add(-60, 'minutes').toDate()
+                     }
+                 }, {
+                     createdTime: {
+                         $gt: moment(tmpNow).add(-61, 'minutes').toDate()
+                     }
+                 }]
+             }, {
+                 $set: {
+                     status: '失败'
+                 }
+             }, {
+                 multi: true
+             });
+         }
+     });
      //SyncedCron.start();
  });
 
@@ -370,14 +379,13 @@
          }
 
          try {
-            //确定不在黑名单中
+             //确定不在黑名单中
              var tmpV0 = Users.findOne({
-                _id: self.userId,
-                "profile.blackList": targetUserId
+                 _id: self.userId,
+                 "profile.blackList": targetUserId
              });
-             if (tmpV0 != null)
-             {
-                throw new Meteor.Error("此人在你黑名单中!");
+             if (tmpV0 != null) {
+                 throw new Meteor.Error("此人在你黑名单中!");
              }
 
              //确定不是本人发送待回复的meet中的目标
@@ -472,14 +480,13 @@
          }
 
          try {
-            //确定不在黑名单中
+             //确定不在黑名单中
              var tmpV0 = Users.findOne({
-                _id: self.userId,
-                "profile.blackList": targetUserId
+                 _id: self.userId,
+                 "profile.blackList": targetUserId
              });
-             if (tmpV0 != null)
-             {
-                throw new Meteor.Error("此人在你黑名单中!");
+             if (tmpV0 != null) {
+                 throw new Meteor.Error("此人在你黑名单中!");
              }
 
              //确定是本人创建的meet
@@ -730,33 +737,33 @@
          }
 
          try {
-            //确定是目标为自己的meet
-            //pptodo: 其实还要确定是否这个meet的状态是属于可被reply的状态, 以及查询和写入数据的时间差
-            var tmpMeet = Meets.findOne(meetId);
-            if (!tmpMeet) {
-                throw new Meteor.Error("没找到对应meet!");
-            }
-            if (tmpMeet.targetUserId != self.userId) {
-                throw new Meteor.Error("只能回复发给自己的meet!");
-            }
-            if (tmpMeet.replyLeft <= 0) {
-                throw new Meteor.Error("没有回复次数!");
-            } else {
-                if (tmpMeet.replyLeft == 1) {
-                    Meets.update(meetId, {
-                        $set: {
-                            replyLeft: 0,
-                            status: '失败'
-                        }
-                    });
-                } else {
-                    Meets.update(meetId, {
-                        $inc: {
-                            replyLeft: -1
-                        }
-                    });
-                }
-            }
+             //确定是目标为自己的meet
+             //pptodo: 其实还要确定是否这个meet的状态是属于可被reply的状态, 以及查询和写入数据的时间差
+             var tmpMeet = Meets.findOne(meetId);
+             if (!tmpMeet) {
+                 throw new Meteor.Error("没找到对应meet!");
+             }
+             if (tmpMeet.targetUserId != self.userId) {
+                 throw new Meteor.Error("只能回复发给自己的meet!");
+             }
+             if (tmpMeet.replyLeft <= 0) {
+                 throw new Meteor.Error("没有回复次数!");
+             } else {
+                 if (tmpMeet.replyLeft == 1) {
+                     Meets.update(meetId, {
+                         $set: {
+                             replyLeft: 0,
+                             status: '失败'
+                         }
+                     });
+                 } else {
+                     Meets.update(meetId, {
+                         $inc: {
+                             replyLeft: -1
+                         }
+                     });
+                 }
+             }
 
              //看meet creater中的特征信息和提供的回复特征信息是否匹配
              var tmpCreater = Users.findOne(tmpMeet.createrUserId);
@@ -1003,7 +1010,9 @@
                          createrUserId: targetUserId
                      }]
                  }],
-                 status:{$ne: '成功'}
+                 status: {
+                     $ne: '成功'
+                 }
              });
 
              //清除相关message
@@ -1025,9 +1034,12 @@
 
              //加入黑名单
              Users.update(
-                self.userId,
-                {$addToSet:{ "profile.blackList": targetUserId}}
-                )
+                 self.userId, {
+                     $addToSet: {
+                         "profile.blackList": targetUserId
+                     }
+                 }
+             )
              return "ppok";
 
          } catch (e) {
@@ -1035,7 +1047,7 @@
              throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
          }
      },
-    addFriend: function(friendUsername) {
+     addFriend: function(friendUsername) {
          var self = this;
          var curUser = Meteor.user();
          if (!self.userId) {
@@ -1047,65 +1059,65 @@
          }
 
          //确定不是自己
-         if (friendUsername == curUser.username){
-            throw new Meteor.Error("不能添加自己为好友!");
+         if (friendUsername == curUser.username) {
+             throw new Meteor.Error("不能添加自己为好友!");
          }
 
-         var tmpFriend = Users.findOne({username: friendUsername});
+         var tmpFriend = Users.findOne({
+             username: friendUsername
+         });
          //确定friendUsername存在
-         if (!tmpFriend)
-         {
+         if (!tmpFriend) {
              throw new Meteor.Error("指定用户不存在!");
          }
 
          //确定friendUsername不是现有好友
          var tmpV1 = Friends.findOne({
-                 $or: [{
-                     '$and': [{
-                         userId1: self.userId
-                     }, {
-                         userId2: tmpFriend._id
-                     }]
+             $or: [{
+                 '$and': [{
+                     userId1: self.userId
                  }, {
-                     '$and': [{
-                         userId2: self.userId
-                     }, {
-                         userId1: tmpFriend._id
-                     }]
+                     userId2: tmpFriend._id
                  }]
-             });
-             if (tmpV1 != null) {
-                 throw new Meteor.Error("此人已是你好友!");
-             }
+             }, {
+                 '$and': [{
+                     userId2: self.userId
+                 }, {
+                     userId1: tmpFriend._id
+                 }]
+             }]
+         });
+         if (tmpV1 != null) {
+             throw new Meteor.Error("此人已是你好友!");
+         }
 
          //确定friendUsername不在进行meet中
          var tmpV2 = Meets.findOne({
-                 $or: [{
-                     '$and': [{
-                         createrUserId: self.userId
-                     }, {
-                         targetUserId: tmpFriend._id
-                     }]
+             $or: [{
+                 '$and': [{
+                     createrUserId: self.userId
                  }, {
-                     '$and': [{
-                         targetUserId: self.userId
-                     }, {
-                         createrUserId: tmpFriend._id
-                     }]
+                     targetUserId: tmpFriend._id
                  }]
-             });
-             if (tmpV2 != null) {
-                 throw new Meteor.Error("此人正在和你meet中!");
-             }
+             }, {
+                 '$and': [{
+                     targetUserId: self.userId
+                 }, {
+                     createrUserId: tmpFriend._id
+                 }]
+             }]
+         });
+         if (tmpV2 != null) {
+             throw new Meteor.Error("此人正在和你meet中!");
+         }
 
          //确定friendUsername不在黑名单中
          var tmpV3 = Users.findOne({
-            _id: self.userId,
-            "profile.blackList": tmpFriend._id
+             _id: self.userId,
+             "profile.blackList": tmpFriend._id
          });
-         if (tmpV3 != null)
-         {
-            throw new Meteor.Error("此人在你黑名单中!");
+         if (tmpV3 != null) {
+             throw new Meteor.Error("此人在你黑名单中!");
          }
 
          //可以加为好友
