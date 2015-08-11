@@ -93,11 +93,11 @@
              userId1: userId1,
              username1: user1.username,
              nickname1: user1.profile.nickname,
-             friendLogo1: user1.profile.specialInfo.specialPic,
+             friendLogo1: (user1.profile.specialInfo && user1.profile.specialInfo.specialPic) || 'img/x.png',
              userId2: userId2,
              username2: user2.username,
              nickname2: user2.profile.nickname,
-             friendLogo2: user2.profile.specialInfo.specialPic
+             friendLogo2: (user2.profile.specialInfo && user2.profile.specialInfo.specialPic) || 'img/x.png'
          });
          //发送初始消息
          Messages.insert({
@@ -1045,11 +1045,6 @@
          if (!(friendUsername)) {
              throw new Meteor.Error("缺少必填项!");
          }
-
-        var tmpNow = new Date();
-        if (!(curUser.profile.lastLocation && curUser.profile.specialInfoTime && moment(curUser.profile.specialInfoTime).valueOf() > moment(tmpNow).startOf('day').valueOf())) {
-             throw new Meteor.Error("请更新特征信息!");
-         } 
 
          //确定不是自己
          if (friendUsername == curUser.username){
