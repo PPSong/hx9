@@ -31,7 +31,7 @@ Meteor.startup(function() {
             });
         }
     });
-    //SyncedCron.start();
+    SyncedCron.start();
 });
 
 Meteor.publish("meets", function() {
@@ -750,21 +750,12 @@ Meteor.methods({
             }
             if (tmpMeet.replyLeft <= 0) {
                 throw new Meteor.Error("没有回复次数!");
-            } else {
-                if (tmpMeet.replyLeft == 1) {
-                    Meets.update(meetId, {
-                        $set: {
-                            replyLeft: 0,
-                            status: '失败'
-                        }
-                    });
-                } else {
+            } else {              
                     Meets.update(meetId, {
                         $inc: {
                             replyLeft: -1
                         }
                     });
-                }
             }
 
             //看meet creater中的特征信息和提供的回复特征信息是否匹配
