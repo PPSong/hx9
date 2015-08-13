@@ -15,11 +15,11 @@
                  },
                  $and: [{
                      createdTime: {
-                         $lt: moment(tmpNow).add(-60, 'minutes').toDate()
+                         $lt: moment(tmpNow).add(-3, 'minutes').toDate()
                      }
                  }, {
                      createdTime: {
-                         $gt: moment(tmpNow).add(-61, 'minutes').toDate()
+                         $gt: moment(tmpNow).add(-4, 'minutes').toDate()
                      }
                  }]
              }, {
@@ -865,9 +865,6 @@
              if (tmpMeet.createrUserId != createrUserId) {
                  throw new Meteor.Error("没有选对目标!");
              }
-             if (moment(tmpMeet.createdTime).add(1, 'minutes').toDate() < tmpNow) {
-                 throw new Meteor.Error("此邀请已过期!");
-             }
 
              Meets.update(meetId, {
                  $set: {
@@ -895,7 +892,26 @@
 
          var tmpNow = new Date();
          try {
-             //todo 如果toUserId不在本人的好友列表不能发送消息
+             //如果toUserId不在本人的好友列表不能发送消息
+             var tmpFriendShip = Friends.findOne({
+					 $or: [{
+					 '$and': [{
+						 userId1: self.userId
+					 }, {
+						 userId2: toUserId
+					 }]
+				 }, {
+					 '$and': [{
+						 userId2: self.userId
+					 }, {
+						 userId1: toUserId
+					 }]
+				 }]
+             });
+             if (tmpFriendShip == null)
+             {
+             	throw new Meteor.Error("对方不是你好友!");
+             }
 
              Messages.insert({
                  fromUserId: self.userId,
