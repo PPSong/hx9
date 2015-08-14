@@ -257,7 +257,7 @@ Meteor.methods({
             throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
         }
     },
-    sendMeetCheck: function() {
+    sendMeetCheck: function(lastLocation) {
         var self = this;
         var curUser = Meteor.user();
         if (!self.userId) {
@@ -265,6 +265,14 @@ Meteor.methods({
         }
 
         try {
+            //保存最新地理位置
+            Users.update(self.userId, {
+                $set: {
+                    "profile.lastLocation": lastLocation,
+                    "profile.lastLocationTime": new Date()
+                }
+            });
+
             var r = _sendMeetCheck(curUser);
             if (r != 'ppok') {
                 throw new Meteor.Error(r);
@@ -750,12 +758,12 @@ Meteor.methods({
             }
             if (tmpMeet.replyLeft <= 0) {
                 throw new Meteor.Error("没有回复次数!");
-            } else {              
-                    Meets.update(meetId, {
-                        $inc: {
-                            replyLeft: -1
-                        }
-                    });
+            } else {
+                Meets.update(meetId, {
+                    $inc: {
+                        replyLeft: -1
+                    }
+                });
             }
 
             //看meet creater中的特征信息和提供的回复特征信息是否匹配
