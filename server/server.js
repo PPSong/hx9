@@ -1,5 +1,19 @@
 Meteor.startup(function() {
-    // code to run on server at startup
+    //code to run on server at startup
+    ActivitiePersons._ensureIndex({
+        activityId: 1,
+        personId: 1
+    }, {
+        unique: 1
+    });
+
+    ActivitiePersons._ensureIndex({
+        activityId: 1,
+        mark: 1
+    }, {
+        unique: 1
+    });
+
     SyncedCron.add({
         name: 'Crunch some important numbers for the marketing department',
         schedule: function(parser) {
@@ -31,7 +45,7 @@ Meteor.startup(function() {
             });
         }
     });
-    SyncedCron.start();
+    //SyncedCron.start();
 });
 
 Meteor.publish("meets", function() {
@@ -48,6 +62,32 @@ Meteor.publish("meets", function() {
     }
 });
 
+Meteor.publish("otherActivities", function() {
+    if (this.userId) {
+        return Activities.find({
+            persons: {
+                $nin: [this.userId]
+            }
+        }, {
+            fields: {
+                persons: 0
+            }
+        });
+    } else {
+        return null;
+    }
+});
+
+Meteor.publish("myActivities", function() {
+    if (this.userId) {
+        return Activities.find({
+            persons: this.userId
+        });
+    } else {
+        return null;
+    }
+});
+
 Meteor.publish("messages", function() {
     if (this.userId) {
         return Messages.find({
@@ -56,10 +96,140 @@ Meteor.publish("messages", function() {
             }, {
                 toUserId: this.userId
             }]
+        }, {
+            fields: {
+                unread: 0
+            }
         });
     } else {
         return null;
     }
+});
+
+// Meteor.publish("unreadMessageCount", function() {
+//     if (!this.userId) {
+//         return null;
+//     }
+
+//     var self = this;
+//     var fakeId = 'ppId';
+//     var count = 0;
+//     var initializing = true;
+
+//     // observeChanges only returns after the initial `added` callbacks
+//     // have run. Until then, we don't want to send a lot of
+//     // `self.changed()` messages - hence tracking the
+//     // `initializing` state.
+//     var handle = Messages.find({
+//         toUserId: self.userId,
+//         unread: true
+//     }).observeChanges({
+//         added: function(id) {
+//             count++;
+//             if (!initializing)
+//                 self.changed("unreadMessageCounts", fakeId, {
+//                     count: count
+//                 });
+//         },
+//         removed: function(id) {
+//                 count--;
+//                 self.changed("unreadMessageCounts", fakeId, {
+//                     count: count
+//                 });
+//             }
+//             // don't care about changed
+//     });
+
+//     // Instead, we'll send one `self.added()` message right after
+//     // observeChanges has returned, and mark the subscription as
+//     // ready.
+//     initializing = false;
+//     self.added("unreadMessageCounts", fakeId, {
+//         count: count
+//     });
+//     self.ready();
+
+//     // Stop observing the cursor when client unsubs.
+//     // Stopping a subscription automatically takes
+//     // care of sending the client any removed messages.
+//     self.onStop(function() {
+//         handle.stop();
+//     });
+// });
+
+Meteor.publish("unreadMessageCount", function() {
+    if (!this.userId) {
+        return null;
+    }
+
+    var self = this;
+    var friendIdUnreadCount = {
+        total: 0
+    };
+    var initializing = true;
+
+    // observeChanges only returns after the initial `added` callbacks
+    // have run. Until then, we don't want to send a lot of
+    // `self.changed()` messages - hence tracking the
+    // `initializing` state.
+    var handle = Messages.find({
+        toUserId: self.userId,
+        unread: true
+    }).observeChanges({
+        added: function(id, fields) {
+            friendIdUnreadCount.total++;
+            friendIdUnreadCount[fields.fromUserId] ? friendIdUnreadCount[fields.fromUserId]++ : friendIdUnreadCount[fields.fromUserId] = 1;
+            if (!initializing) {
+                self.changed("unreadMessageCounts", 'total', {
+                    count: friendIdUnreadCount.total
+                });
+                if (friendIdUnreadCount[fields.fromUserId] == 1) {
+                    self.added("unreadMessageCounts", fields.fromUserId, {
+                        count: friendIdUnreadCount[fields.fromUserId]
+                    });
+                } else {
+                    self.changed("unreadMessageCounts", fields.fromUserId, {
+                        count: friendIdUnreadCount[fields.fromUserId]
+                    });
+                }
+            }
+        },
+        removed: function(id) {
+                friendIdUnreadCount.total--;
+                self.changed("unreadMessageCounts", 'total', {
+                    count: friendIdUnreadCount.total
+                });
+                var tmpMessage = Messages.findOne({_id: id});
+                if (friendIdUnreadCount[tmpMessage.fromUserId] == 1) {
+                    delete friendIdUnreadCount[tmpMessage.fromUserId];
+                    self.removed("unreadMessageCounts", tmpMessage.fromUserId);
+                } else {
+                    friendIdUnreadCount[tmpMessage.fromUserId]--;
+                    self.changed("unreadMessageCounts", tmpMessage.fromUserId, {
+                        count: friendIdUnreadCount[tmpMessage.fromUserId]
+                    });
+                }
+            }
+            // don't care about changed
+    });
+
+    // Instead, we'll send one `self.added()` message right after
+    // observeChanges has returned, and mark the subscription as
+    // ready.
+    initializing = false;
+    for (var key in friendIdUnreadCount) {
+        self.added("unreadMessageCounts", key, {
+            count: friendIdUnreadCount[key]
+        });
+    }
+    self.ready();
+
+    // Stop observing the cursor when client unsubs.
+    // Stopping a subscription automatically takes
+    // care of sending the client any removed messages.
+    self.onStop(function() {
+        handle.stop();
+    });
 });
 
 Meteor.publish("friends", function() {
@@ -1144,6 +1314,34 @@ Meteor.methods({
 
         //加为好友
         return _createFriend(self.userId, tmpFriend._id);
+    },
+    chooseMark: function(activityId, mark) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId && mark)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        try {
+            ActivitiePersons.insert({
+                activityId: activityId,
+                personId: this.userId,
+                mark: mark
+            });
+            Activities.update(activityId, {
+                $addToSet: {
+                    persons: this.userId
+                }
+            });
+            return "ppok";
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
     }
 
 });

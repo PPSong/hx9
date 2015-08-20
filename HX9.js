@@ -1,5 +1,53 @@
 Schema = {};
 
+//activity schema
+Schema.Activity = new SimpleSchema({
+    title: {
+        type: String
+    },
+    description: {
+        type: String,
+        optional: true
+    },
+    personCount: {
+        type: Number
+    },
+    image: {
+        type: String,
+        optional: true
+    },
+    start: {
+        type: Date
+    },
+    end: {
+        type: Date
+    },
+    place: {
+        type: String
+    },
+    persons:{
+        type: [String],
+        optional: true
+    }
+});
+
+//activity person
+Schema.ActivityPerson = new SimpleSchema({
+    activityId: {
+        type: String
+    },
+    personId: {
+        type: String
+    },
+    mark: {
+        type: Number
+    },
+    like: {
+        type: [String],
+        optional: true
+    }
+});
+
 //user schema
 Schema.SelfSpecialInfo = new SimpleSchema({
     hair: {
@@ -310,6 +358,12 @@ Schema.Message = new SimpleSchema({
     }
 });
 //end message schema
+Activities = new Mongo.Collection("activities");
+Activities.attachSchema(Schema.Activity);
+
+ActivitiePersons = new Mongo.Collection("activitiePersons");
+ActivitiePersons.attachSchema(Schema.ActivityPerson);
+
 Users = Meteor.users;
 Users.attachSchema(Schema.User);
 
@@ -335,5 +389,17 @@ Messages.allow({
     update: function() {
         return true;
     }
+});
+Activities.allow({
+    insert: function() {
+        return true;
+    },
 
+    remove: function() {
+        return true;
+    },
+
+    update: function() {
+        return true;
+    }
 });
