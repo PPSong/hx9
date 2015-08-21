@@ -1,5 +1,36 @@
 Schema = {};
 
+Schema.GroupChatMessage = new SimpleSchema({
+    activityId: {
+        type: String
+    },
+    fromUserId: {
+        type: String
+    },
+    fromUserMark: {
+        type: String
+    },
+    content: {
+        type: String,
+        optional: true
+    },
+    createdTime: {
+        type: Date,
+        denyUpdate: true,
+        autoValue: function() {
+            if (this.isInsert) {
+                return new Date;
+            } else if (this.isUpsert) {
+                return {
+                    $setOnInsert: new Date
+                };
+            } else {
+                this.unset();
+            }
+        }
+    }
+});
+
 //activity schema
 Schema.Activity = new SimpleSchema({
     title: {
@@ -25,9 +56,13 @@ Schema.Activity = new SimpleSchema({
     place: {
         type: String
     },
-    persons:{
+    persons: {
         type: [String],
         optional: true
+    },
+    mine: {
+        type: Boolean,
+        defaultValue: true
     }
 });
 
@@ -41,6 +76,10 @@ Schema.ActivityPerson = new SimpleSchema({
     },
     mark: {
         type: Number
+    },
+    lastChatTime: {
+        type: Date,
+        optional: true
     },
     like: {
         type: [String],
@@ -363,6 +402,9 @@ Activities.attachSchema(Schema.Activity);
 
 ActivitiePersons = new Mongo.Collection("activitiePersons");
 ActivitiePersons.attachSchema(Schema.ActivityPerson);
+
+GroupChatMessages = new Mongo.Collection("groupChatMessages");
+GroupChatMessages.attachSchema(Schema.GroupChatMessage);
 
 Users = Meteor.users;
 Users.attachSchema(Schema.User);

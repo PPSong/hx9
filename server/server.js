@@ -70,7 +70,8 @@ Meteor.publish("otherActivities", function() {
             }
         }, {
             fields: {
-                persons: 0
+                persons: 0,
+                mine: 0
             }
         });
     } else {
@@ -86,6 +87,104 @@ Meteor.publish("myActivities", function() {
     } else {
         return null;
     }
+});
+
+Meteor.publish("groupChatMessages", function(activityId) {
+    if (this.userId) {
+        return GroupChatMessages.find({
+            activityId: activityId
+        });
+    } else {
+        return null;
+    }
+});
+
+Meteor.publish("unreadGroupChatMessageCount", function() {
+    if (!this.userId) {
+        return null;
+    }
+
+    var self = this;
+    var groupUnreadCount = {
+        total: 0
+    };
+    var initializing = true;
+
+    var tmpActivities = Activities.find({
+        persons: self.userId
+    }, {
+        fields: {
+            _id: 1
+        }
+    }).map(function(item) {
+        return item._id;
+    });
+
+    // observeChanges only returns after the initial `added` callbacks
+    // have run. Until then, we don't want to send a lot of
+    // `self.changed()` messages - hence tracking the
+    // `initializing` state.
+    var handle = GroupChatMessages.find({
+        activityId: {
+            $in: tmpActivities
+        }
+    }).observeChanges({
+        added: function(id, fields) {
+            groupUnreadCount.total++;
+            groupUnreadCount[fields.activityId] ? groupUnreadCount[fields.activityId]++ : groupUnreadCount[fields.activityId] = 1;
+            if (!initializing) {
+                self.changed("unreadGroupChatMessageCounts", 'total', {
+                    count: groupUnreadCount.total
+                });
+                if (groupUnreadCount[fields.activityId] == 1) {
+                    self.added("unreadGroupChatMessageCounts", fields.activityId, {
+                        count: groupUnreadCount[fields.activityId]
+                    });
+                } else {
+                    self.changed("unreadGroupChatMessageCounts", fields.activityId, {
+                        count: groupUnreadCount[fields.activityId]
+                    });
+                }
+            }
+        },
+        removed: function(id) {
+                groupUnreadCount.total--;
+                self.changed("unreadGroupChatMessageCounts", 'total', {
+                    count: groupUnreadCount.total
+                });
+                var tmpMessage = GroupChatMessages.findOne({
+                    _id: id
+                });
+                if (groupUnreadCount[tmpMessage.activityId] == 1) {
+                    delete groupUnreadCount[tmpMessage.activityId];
+                    self.removed("unreadGroupChatMessageCounts", tmpMessage.activityId);
+                } else {
+                    groupUnreadCount[tmpMessage.activityId]--;
+                    self.changed("unreadGroupChatMessageCounts", tmpMessage.activityId, {
+                        count: groupUnreadCount[tmpMessage.activityId]
+                    });
+                }
+            }
+            // don't care about changed
+    });
+
+    // Instead, we'll send one `self.added()` message right after
+    // observeChanges has returned, and mark the subscription as
+    // ready.
+    initializing = false;
+    for (var key in groupUnreadCount) {
+        self.added("unreadGroupChatMessageCounts", key, {
+            count: groupUnreadCount[key]
+        });
+    }
+    self.ready();
+
+    // Stop observing the cursor when client unsubs.
+    // Stopping a subscription automatically takes
+    // care of sending the client any removed messages.
+    self.onStop(function() {
+        handle.stop();
+    });
 });
 
 Meteor.publish("messages", function() {
@@ -105,57 +204,6 @@ Meteor.publish("messages", function() {
         return null;
     }
 });
-
-// Meteor.publish("unreadMessageCount", function() {
-//     if (!this.userId) {
-//         return null;
-//     }
-
-//     var self = this;
-//     var fakeId = 'ppId';
-//     var count = 0;
-//     var initializing = true;
-
-//     // observeChanges only returns after the initial `added` callbacks
-//     // have run. Until then, we don't want to send a lot of
-//     // `self.changed()` messages - hence tracking the
-//     // `initializing` state.
-//     var handle = Messages.find({
-//         toUserId: self.userId,
-//         unread: true
-//     }).observeChanges({
-//         added: function(id) {
-//             count++;
-//             if (!initializing)
-//                 self.changed("unreadMessageCounts", fakeId, {
-//                     count: count
-//                 });
-//         },
-//         removed: function(id) {
-//                 count--;
-//                 self.changed("unreadMessageCounts", fakeId, {
-//                     count: count
-//                 });
-//             }
-//             // don't care about changed
-//     });
-
-//     // Instead, we'll send one `self.added()` message right after
-//     // observeChanges has returned, and mark the subscription as
-//     // ready.
-//     initializing = false;
-//     self.added("unreadMessageCounts", fakeId, {
-//         count: count
-//     });
-//     self.ready();
-
-//     // Stop observing the cursor when client unsubs.
-//     // Stopping a subscription automatically takes
-//     // care of sending the client any removed messages.
-//     self.onStop(function() {
-//         handle.stop();
-//     });
-// });
 
 Meteor.publish("unreadMessageCount", function() {
     if (!this.userId) {
@@ -199,7 +247,9 @@ Meteor.publish("unreadMessageCount", function() {
                 self.changed("unreadMessageCounts", 'total', {
                     count: friendIdUnreadCount.total
                 });
-                var tmpMessage = Messages.findOne({_id: id});
+                var tmpMessage = Messages.findOne({
+                    _id: id
+                });
                 if (friendIdUnreadCount[tmpMessage.fromUserId] == 1) {
                     delete friendIdUnreadCount[tmpMessage.fromUserId];
                     self.removed("unreadMessageCounts", tmpMessage.fromUserId);
@@ -1342,6 +1392,72 @@ Meteor.methods({
             console.log(e);
             throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
         }
-    }
+    },
+    sendGroupMessage: function(message, activityId) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
 
+        if (!(message && activityId)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        var tmpNow = new Date();
+        try {
+            //如果本人不在活动中不能发送
+            var tmpActivityPerson = ActivitiePersons.findOne({
+                activityId: activityId,
+                personId: self.userId
+            });
+            if (tmpActivityPerson == null) {
+                throw new Meteor.Error("你不在活动中!");
+            }
+
+            GroupChatMessages.insert({
+                activityId: activityId,
+                fromUserId: self.userId,
+                fromUserMark: tmpActivityPerson.mark,
+                content: message
+            });
+            return "ppok";
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    },
+    updateLastChatTime: function(activityId) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        var tmpNow = new Date();
+        try {
+            var tmpCount = ActivitiePersons.update({
+                activityId: activityId,
+                personId: self.userId
+            }, {
+                $set: {
+                    lastChatTime: tmpNow
+                }
+            });
+
+            //如果本人不在活动中不能操作
+            if (tmpCount == 1) {
+                return "ppok";
+            } else {
+                throw new Meteor.Error("你不在活动中!");
+            }
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    }
 });
