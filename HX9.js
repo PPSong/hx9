@@ -31,6 +31,15 @@ Schema.GroupChatMessage = new SimpleSchema({
     }
 });
 
+Schema.Person = new SimpleSchema({
+    userId: {
+        type: String
+    },
+    mark: {
+        type: String
+    }
+});
+
 //activity schema
 Schema.Activity = new SimpleSchema({
     title: {
@@ -57,7 +66,7 @@ Schema.Activity = new SimpleSchema({
         type: String
     },
     persons: {
-        type: [String],
+        type: [Schema.Person],
         optional: true
     },
     mine: {
@@ -400,8 +409,8 @@ Schema.Message = new SimpleSchema({
 Activities = new Mongo.Collection("activities");
 Activities.attachSchema(Schema.Activity);
 
-ActivitiePersons = new Mongo.Collection("activitiePersons");
-ActivitiePersons.attachSchema(Schema.ActivityPerson);
+ActivityPersons = new Mongo.Collection("activityPersons");
+ActivityPersons.attachSchema(Schema.ActivityPerson);
 
 GroupChatMessages = new Mongo.Collection("groupChatMessages");
 GroupChatMessages.attachSchema(Schema.GroupChatMessage);

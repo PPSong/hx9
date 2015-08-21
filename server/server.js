@@ -1,13 +1,13 @@
 Meteor.startup(function() {
     //code to run on server at startup
-    ActivitiePersons._ensureIndex({
+    ActivityPersons._ensureIndex({
         activityId: 1,
         personId: 1
     }, {
         unique: 1
     });
 
-    ActivitiePersons._ensureIndex({
+    ActivityPersons._ensureIndex({
         activityId: 1,
         mark: 1
     }, {
@@ -66,7 +66,9 @@ Meteor.publish("otherActivities", function() {
     if (this.userId) {
         return Activities.find({
             persons: {
-                $nin: [this.userId]
+                $nin: [{
+                    userId: this.userId
+                }]
             }
         }, {
             fields: {
@@ -82,7 +84,17 @@ Meteor.publish("otherActivities", function() {
 Meteor.publish("myActivities", function() {
     if (this.userId) {
         return Activities.find({
-            persons: this.userId
+            "persons.userId": this.userId
+        });
+    } else {
+        return null;
+    }
+});
+
+Meteor.publish("activityPersons", function() {
+    if (this.userId) {
+        return ActivityPersons.find({
+            personId: this.userId
         });
     } else {
         return null;
@@ -97,103 +109,6 @@ Meteor.publish("groupChatMessages", function(activityId) {
     } else {
         return null;
     }
-});
-
-Meteor.publish("unreadGroupChatMessageCount", function() {
-    if (!this.userId) {
-        return null;
-    }
-
-    var self = this;
-    var groupUnreadCount = {
-        total: 0
-    };
-    var initializing = true;
-
-    var tmpActivitiePersons = ActivitiePersons.find({
-        personId: self.userId
-    }, {
-        fields: {
-            _id: 0,
-            activityId: 1,
-            lastChatTime: 1
-        }
-    }).fetch();
-
-    var tmpActivities = [];
-    var tmpActivityLastChatTime = {};
-
-    for (var i = 0; i < tmpActivitiePersons.length; i++) {
-        tmpActivities.push(tmpActivitiePersons[i].activityId);
-        tmpActivityLastChatTime[tmpActivitiePersons[i].activityId] = tmpActivitiePersons[i].lastChatTime;
-    }
-
-    // observeChanges only returns after the initial `added` callbacks
-    // have run. Until then, we don't want to send a lot of
-    // `self.changed()` messages - hence tracking the
-    // `initializing` state.
-    var handle = GroupChatMessages.find({
-        activityId: {
-            $in: tmpActivities
-        },
-        $where: "this.createdTime > tmpActivityLastChatTime[this.activityId]"
-    }).observeChanges({
-        added: function(id, fields) {
-            groupUnreadCount.total++;
-            groupUnreadCount[fields.activityId] ? groupUnreadCount[fields.activityId]++ : groupUnreadCount[fields.activityId] = 1;
-            if (!initializing) {
-                self.changed("unreadGroupChatMessageCounts", 'total', {
-                    count: groupUnreadCount.total
-                });
-                if (groupUnreadCount[fields.activityId] == 1) {
-                    self.added("unreadGroupChatMessageCounts", fields.activityId, {
-                        count: groupUnreadCount[fields.activityId]
-                    });
-                } else {
-                    self.changed("unreadGroupChatMessageCounts", fields.activityId, {
-                        count: groupUnreadCount[fields.activityId]
-                    });
-                }
-            }
-        },
-        removed: function(id) {
-                groupUnreadCount.total--;
-                self.changed("unreadGroupChatMessageCounts", 'total', {
-                    count: groupUnreadCount.total
-                });
-                var tmpMessage = GroupChatMessages.findOne({
-                    _id: id
-                });
-                if (groupUnreadCount[tmpMessage.activityId] == 1) {
-                    delete groupUnreadCount[tmpMessage.activityId];
-                    self.removed("unreadGroupChatMessageCounts", tmpMessage.activityId);
-                } else {
-                    groupUnreadCount[tmpMessage.activityId]--;
-                    self.changed("unreadGroupChatMessageCounts", tmpMessage.activityId, {
-                        count: groupUnreadCount[tmpMessage.activityId]
-                    });
-                }
-            }
-            // don't care about changed
-    });
-
-    // Instead, we'll send one `self.added()` message right after
-    // observeChanges has returned, and mark the subscription as
-    // ready.
-    initializing = false;
-    for (var key in groupUnreadCount) {
-        self.added("unreadGroupChatMessageCounts", key, {
-            count: groupUnreadCount[key]
-        });
-    }
-    self.ready();
-
-    // Stop observing the cursor when client unsubs.
-    // Stopping a subscription automatically takes
-    // care of sending the client any removed messages.
-    self.onStop(function() {
-        handle.stop();
-    });
 });
 
 Meteor.publish("messages", function() {
@@ -1386,14 +1301,17 @@ Meteor.methods({
         }
 
         try {
-            ActivitiePersons.insert({
+            ActivityPersons.insert({
                 activityId: activityId,
                 personId: this.userId,
                 mark: mark
             });
             Activities.update(activityId, {
                 $addToSet: {
-                    persons: this.userId
+                    persons: {
+                        userId: this.userId,
+                        mark: mark
+                    }
                 }
             });
             return "ppok";
@@ -1416,7 +1334,7 @@ Meteor.methods({
         var tmpNow = new Date();
         try {
             //如果本人不在活动中不能发送
-            var tmpActivityPerson = ActivitiePersons.findOne({
+            var tmpActivityPerson = ActivityPersons.findOne({
                 activityId: activityId,
                 personId: self.userId
             });
@@ -1431,11 +1349,11 @@ Meteor.methods({
                 content: message
             });
 
-            ActivitiePersons.update({
+            ActivityPersons.update({
                 activityId: activityId
             }, {
                 $inc: {
-                    unread: 1
+                    unreadCount: 1
                 }
             }, {
                 multi: true
@@ -1458,7 +1376,7 @@ Meteor.methods({
         }
 
         try {
-            var tmpCount = ActivitiePersons.update({
+            var tmpCount = ActivityPersons.update({
                 activityId: activityId,
                 personId: self.userId
             }, {
@@ -1472,6 +1390,58 @@ Meteor.methods({
                 return "ppok";
             } else {
                 throw new Meteor.Error("你不在活动中!");
+            }
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    },
+    chooseLike: function(activityId, targetUserId) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId && targetUserId)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        if (self.userId == targetUserId) {
+            throw new Meteor.Error("不能选择自己!");
+        }
+
+        try {
+            var tmpCount = ActivityPersons.update({
+                activityId: activityId,
+                personId: self.userId
+            }, {
+                $addToSet: {
+                    like: targetUserId
+                }
+            });
+
+            //如果本人不在活动中不能操作
+            if (tmpCount == 0) {
+                throw new Meteor.Error("你不在活动中!");
+            }
+
+            //检查是否互相like
+            var tmpRecord = ActivityPersons.findOne({
+                activityId: activityId,
+                personId: targetUserId,
+                like: self.userId
+            });
+
+            if (tmpRecord != null) {
+                //相互like
+                if (_createFriend(targetUserId, self.userId) == 'ppok') {
+                    return '恭喜, 已加对方为好友!';
+                } else {
+                    throw new Meteor.Error("创建朋友失败!");
+                }
+            } else {
+                return 'ppok';
             }
         } catch (e) {
             console.log(e);
