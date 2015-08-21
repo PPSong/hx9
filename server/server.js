@@ -110,15 +110,23 @@ Meteor.publish("unreadGroupChatMessageCount", function() {
     };
     var initializing = true;
 
-    var tmpActivities = Activities.find({
-        persons: self.userId
+    var tmpActivitiePersons = ActivitiePersons.find({
+        personId: self.userId
     }, {
         fields: {
-            _id: 1
+            _id: 0,
+            activityId: 1,
+            lastChatTime: 1
         }
-    }).map(function(item) {
-        return item._id;
-    });
+    }).fetch();
+
+    var tmpActivities = [];
+    var tmpActivityLastChatTime = {};
+
+    for (var i = 0; i < tmpActivitiePersons.length; i++) {
+        tmpActivities.push(tmpActivitiePersons[i].activityId);
+        tmpActivityLastChatTime[tmpActivitiePersons[i].activityId] = tmpActivitiePersons[i].lastChatTime;
+    }
 
     // observeChanges only returns after the initial `added` callbacks
     // have run. Until then, we don't want to send a lot of
@@ -127,7 +135,8 @@ Meteor.publish("unreadGroupChatMessageCount", function() {
     var handle = GroupChatMessages.find({
         activityId: {
             $in: tmpActivities
-        }
+        },
+        $where: "this.createdTime > tmpActivityLastChatTime[this.activityId]"
     }).observeChanges({
         added: function(id, fields) {
             groupUnreadCount.total++;
@@ -1421,13 +1430,23 @@ Meteor.methods({
                 fromUserMark: tmpActivityPerson.mark,
                 content: message
             });
+
+            ActivitiePersons.update({
+                activityId: activityId
+            }, {
+                $inc: {
+                    unread: 1
+                }
+            }, {
+                multi: true
+            });
             return "ppok";
         } catch (e) {
             console.log(e);
             throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
         }
     },
-    updateLastChatTime: function(activityId) {
+    readGroupMessage: function(activityId) {
         var self = this;
         var curUser = Meteor.user();
         if (!self.userId) {
@@ -1438,14 +1457,13 @@ Meteor.methods({
             throw new Meteor.Error("缺少必填项!");
         }
 
-        var tmpNow = new Date();
         try {
             var tmpCount = ActivitiePersons.update({
                 activityId: activityId,
                 personId: self.userId
             }, {
                 $set: {
-                    lastChatTime: tmpNow
+                    unreadCount: 0
                 }
             });
 

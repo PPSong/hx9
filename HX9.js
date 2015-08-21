@@ -77,9 +77,9 @@ Schema.ActivityPerson = new SimpleSchema({
     mark: {
         type: Number
     },
-    lastChatTime: {
-        type: Date,
-        optional: true
+    unreadCount: {
+        type: Number,
+        defaultValue: 0
     },
     like: {
         type: [String],
