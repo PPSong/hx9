@@ -105,6 +105,11 @@ Meteor.publish("groupChatMessages", function(activityId) {
     if (this.userId) {
         return GroupChatMessages.find({
             activityId: activityId
+        }, {
+            sort: {
+                createdTime: -1
+            },
+            limit: 10
         });
     } else {
         return null;

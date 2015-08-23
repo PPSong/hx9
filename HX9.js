@@ -202,6 +202,11 @@ Schema.User = new SimpleSchema({
         optional: true,
         blackbox: true
     },
+    status: {
+		type: Object,
+		optional: true,
+		blackbox: true
+  	}
 });
 //end user schema
 
