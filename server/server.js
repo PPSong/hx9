@@ -101,15 +101,17 @@ Meteor.publish("activityPersons", function() {
     }
 });
 
-Meteor.publish("groupChatMessages", function(activityId) {
+Meteor.publish("groupChatMessages", function(activityId, startTime) {
     if (this.userId) {
         return GroupChatMessages.find({
-            activityId: activityId
+            activityId: activityId,
+            createdTime: {
+                $gte: moment(startTime).toDate()
+            }
         }, {
             sort: {
                 createdTime: -1
-            },
-            limit: 10
+            }
         });
     } else {
         return null;
@@ -1417,19 +1419,25 @@ Meteor.methods({
         }
 
         try {
-            var tmpCount = ActivityPersons.update({
+            var tmpActivityPerson = ActivityPersons.findOne({
                 activityId: activityId,
                 personId: self.userId
-            }, {
+            });
+
+            //如果本人不在活动中不能操作
+            if (tmpActivityPerson == null) {
+                throw new Meteor.Error("你不在活动中!");
+            }
+
+            if (tmpActivityPerson.like && tmpActivityPerson.like.length >= 3) {
+                throw new Meteor.Error("一个活动最多能选择3个like");
+            }
+
+            var tmpCount = ActivityPersons.update(tmpActivityPerson._id, {
                 $addToSet: {
                     like: targetUserId
                 }
             });
-
-            //如果本人不在活动中不能操作
-            if (tmpCount == 0) {
-                throw new Meteor.Error("你不在活动中!");
-            }
 
             //检查是否互相like
             var tmpRecord = ActivityPersons.findOne({
@@ -1448,6 +1456,113 @@ Meteor.methods({
             } else {
                 return 'ppok';
             }
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    },
+    deChooseLike: function(activityId, targetUserId) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId && targetUserId)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        if (self.userId == targetUserId) {
+            throw new Meteor.Error("不能选择自己!");
+        }
+
+        try {
+            var tmpCount = ActivityPersons.update({
+                activityId: activityId,
+                personId: self.userId
+            }, {
+                $pull: {
+                    like: targetUserId
+                }
+            });
+
+            //如果本人不在活动中不能操作
+            if (tmpCount == 0) {
+                throw new Meteor.Error("你不在活动中!");
+            }
+
+            return 'ppok';
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    },
+    getGroupMessageTimeStamp: function(activityId) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        try {
+            var tmpMessage = GroupChatMessages.findOne({
+                activityId: activityId
+            }, {
+                sort: {
+                    createdTime: -1
+                },
+                skip: 19
+            });
+
+            if (tmpMessage == null) {
+                return moment(new Date()).valueOf();
+            } else {
+                return moment(tmpMessage.createdTime).valueOf();
+            }
+        } catch (e) {
+            console.log(e);
+            throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
+        }
+    },
+    getHistoryMessage: function(activityId, startTime) {
+        var self = this;
+        var curUser = Meteor.user();
+        if (!self.userId) {
+            throw new Meteor.Error("请先登录!");
+        }
+
+        if (!(activityId || startTime)) {
+            throw new Meteor.Error("缺少必填项!");
+        }
+
+        try {
+            var tmpCount = ActivityPersons.findOne({
+                activityId: activityId,
+                personId: self.userId
+            });
+
+            //如果本人不在活动中不能操作
+            if (tmpCount == 0) {
+                throw new Meteor.Error("你不在活动中!");
+            }
+
+            var tmpMessages = GroupChatMessages.find({
+                activityId: activityId,
+                createdTime: {
+                    $lt: moment(startTime).toDate()
+                }
+            }, {
+                sort: {
+                    createdTime: -1
+                },
+                limit: 10
+            }).fetch();
+
+            return tmpMessages;
         } catch (e) {
             console.log(e);
             throw new Meteor.Error(e + "(500)", e.sanitizedError, e.invalidKeys);
