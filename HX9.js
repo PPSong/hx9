@@ -50,7 +50,9 @@ Schema.Activity = new SimpleSchema({
         optional: true
     },
     personCount: {
-        type: Number
+        type: Number,
+        min: 2,
+        max: 20
     },
     image: {
         type: String,
